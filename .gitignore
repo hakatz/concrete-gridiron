@@ -1,0 +1,57 @@
+# Node / Next.js build artifacts
+frontend/.next/
+frontend/out/
+frontend/node_modules/
+node_modules/
+.next/
+out/
+dist/
+build/
+
+# Next.js telemetry & cache
+.vercel
+*.tsbuildinfo
+next-env.d.ts
+
+# SQLite Database & Scraped Raw HTML / Caches
+backend/cache/
+backend/data/*.db
+backend/data/*.sqlite
+backend/data/*.sqlite3
+backend/data/*.html
+backend/data/cache/
+*.db
+*.sqlite
+*.sqlite3
+
+# Yahoo Auth & Playwright session (CRITICAL: contains private auth tokens & session cookies)
+backend/session.json
+session.json
+
+# Python artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Environment variables & local secrets
+.env
+.env*.local
+
+# System & OS files
+.DS_Store
+Thumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# IDE & Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
