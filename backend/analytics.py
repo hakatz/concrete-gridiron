@@ -132,6 +132,7 @@ def generate_analytics():
 
     weekly_scores = defaultdict(list)
     single_week_records = []
+    single_matchup_games = []
 
     for m in matchups:
         t1 = teams.get(m["team1_id"])
@@ -167,6 +168,19 @@ def generate_analytics():
             "opponent_score": s1, "margin": round(abs(s2 - s1), 2),
             "is_playoffs": bool(m["is_playoffs"])
         })
+
+        if s1 > 0 and s2 > 0:
+            w_id, w_score = (m1_id, s1) if s1 >= s2 else (m2_id, s2)
+            l_id, l_score = (m2_id, s2) if s1 >= s2 else (m1_id, s1)
+            single_matchup_games.append({
+                "year": m["season_year"], "week": m["week"],
+                "winner_id": w_id, "winner_name": managers[w_id]["display_name"], "winner_score": w_score,
+                "loser_id": l_id, "loser_name": managers[l_id]["display_name"], "loser_score": l_score,
+                "manager_name": managers[w_id]["display_name"],
+                "opponent_name": managers[l_id]["display_name"],
+                "margin": round(abs(s1 - s2), 2),
+                "is_playoffs": bool(m["is_playoffs"])
+            })
 
         h2h_matrix[m1_id][m2_id]["points_for"] += s1
         h2h_matrix[m1_id][m2_id]["points_against"] += s2
@@ -448,8 +462,8 @@ def generate_analytics():
     valid_records = [r for r in single_week_records if r["score"] > 0]
     all_time_high_scores = sorted(valid_records, key=lambda x: x["score"], reverse=True)[:10]
     all_time_low_scores = sorted(valid_records, key=lambda x: x["score"])[:10]
-    biggest_blowouts = sorted(valid_records, key=lambda x: x["margin"], reverse=True)[:10]
-    closest_games = sorted(valid_records, key=lambda x: x["margin"])[:10]
+    biggest_blowouts = sorted(single_matchup_games, key=lambda x: x["margin"], reverse=True)[:10]
+    closest_games = sorted(single_matchup_games, key=lambda x: x["margin"])[:10]
 
     hall_of_fame = []
     for s in seasons:

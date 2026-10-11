@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import leagueData from "@/data/league_analytics.json";
-import { Trophy, Medal, Flame, Zap, Award, ArrowUpRight, TrendingUp, Shield, Activity, ChevronDown } from "lucide-react";
+import { Trophy, Medal, Flame, Zap, Award, ArrowUpRight, TrendingUp, Shield, Activity, ChevronDown, ArrowUpDown } from "lucide-react";
 
 const ARCHETYPE_DESCRIPTIONS: Record<string, string> = {
   "Dynasty Architect": "Won 3+ championships across their career",
@@ -24,6 +24,9 @@ const ARCHETYPE_DESCRIPTIONS: Record<string, string> = {
 export default function DashboardPage() {
   const { hall_of_fame, records, managers, historical_seasons } = leagueData;
   const [showRollCall, setShowRollCall] = useState(false);
+  const [selectedSeason, setSelectedSeason] = useState<string>("ALL");
+  const [sortField, setSortField] = useState<string>("win_pct");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
 
   const titleCounts: Record<string, { count: number; name: string; id: string }> = {};
   hall_of_fame.forEach((hof) => {
@@ -34,6 +37,106 @@ export default function DashboardPage() {
     titleCounts[id].count += 1;
   });
   const sortedChamps = Object.values(titleCounts).sort((a, b) => b.count - a.count);
+
+  const handleSort = (field: string) => {
+    if (sortField === field) {
+      setSortDir(sortDir === "desc" ? "asc" : "desc");
+    } else {
+      setSortField(field);
+      setSortDir("desc");
+    }
+  };
+
+  const handleSeasonChange = (val: string) => {
+    setSelectedSeason(val);
+    if (val !== "ALL") {
+      setSortField("reg_finish");
+      setSortDir("asc");
+    } else {
+      setSortField("win_pct");
+      setSortDir("desc");
+    }
+  };
+
+  const hofForSelectedYear = selectedSeason !== "ALL" 
+    ? hall_of_fame.find((h) => h.year === Number(selectedSeason)) 
+    : null;
+
+  // Build rows based on Career (ALL) or Specific Season
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const tableRows: any[] = [];
+  if (selectedSeason === "ALL") {
+    managers.forEach((rawM: any) => {
+      tableRows.push({
+        id: rawM.manager_id,
+        name: rawM.name,
+        isChamp: false,
+        isRunnerUp: false,
+        playoffRank: null,
+        titles: rawM.career.championships,
+        wins: rawM.career.wins,
+        losses: rawM.career.losses,
+        ties: rawM.career.ties || 0,
+        win_pct: rawM.career.win_pct,
+        points_for: rawM.career.points_for,
+        avg_pf: rawM.career.avg_pf_per_game,
+        moves: rawM.career.total_moves,
+        retention: rawM.career.roster_retention_rate || 0,
+        archetypes: rawM.archetypes,
+      });
+    });
+  } else {
+    const yr = Number(selectedSeason);
+    managers.forEach((rawM: any) => {
+      const ht = (rawM.historical_teams || []).find((t: any) => t.year === yr);
+      if (ht) {
+        const isChamp = hofForSelectedYear?.champion?.manager_id === rawM.manager_id;
+        const isRunnerUp = hofForSelectedYear?.runner_up?.manager_id === rawM.manager_id;
+        const totalGames = ht.wins + ht.losses;
+        const win_pct = totalGames > 0 ? Number(((ht.wins / totalGames) * 100).toFixed(1)) : 0;
+        const avg_pf = totalGames > 0 ? Number((ht.pf / totalGames).toFixed(1)) : 0;
+        tableRows.push({
+          id: rawM.manager_id,
+          name: rawM.name,
+          teamName: ht.name,
+          isChamp,
+          isRunnerUp,
+          playoffRank: ht.rank,
+          titles: isChamp ? 1 : 0,
+          wins: ht.wins,
+          losses: ht.losses,
+          ties: 0,
+          win_pct,
+          points_for: ht.pf,
+          avg_pf,
+          moves: ht.moves || 0,
+          retention: 0,
+          archetypes: rawM.archetypes,
+        });
+      }
+    });
+
+    // Compute regular season finish rank (seed by wins descending, then PF descending)
+    tableRows.sort((a, b) => {
+      if (b.wins !== a.wins) return b.wins - a.wins;
+      return b.points_for - a.points_for;
+    });
+    tableRows.forEach((r, idx) => {
+      r.reg_finish = idx + 1;
+    });
+  }
+
+  // Apply user selected sorting
+  tableRows.sort((a, b) => {
+    let aVal = a[sortField];
+    let bVal = b[sortField];
+    if (aVal === undefined || aVal === null) aVal = 0;
+    if (bVal === undefined || bVal === null) bVal = 0;
+    if (typeof aVal === "string") {
+      return sortDir === "asc" ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
+    }
+    return sortDir === "asc" ? aVal - bVal : bVal - aVal;
+  });
 
   return (
     <div className="space-y-10">
@@ -143,79 +246,225 @@ export default function DashboardPage() {
       </section>
 
       <section className="space-y-4">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <Activity className="w-6 h-6 text-emerald-400" />
-            <h2 className="text-xl font-extrabold text-white tracking-tight">All-Time Career Standings & Tendencies</h2>
+            <h2 className="text-xl font-extrabold text-white tracking-tight">
+              {selectedSeason === "ALL" ? "All-Time Career Standings & Tendencies" : `${selectedSeason} Season Leaderboard`}
+            </h2>
           </div>
-          <span className="text-xs text-slate-400">Sorted by Championships & Win %</span>
+
+          <div className="flex items-center gap-3">
+            <span className="text-xs text-slate-400">Season:</span>
+            <select
+              value={selectedSeason}
+              onChange={(e) => handleSeasonChange(e.target.value)}
+              className="bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-xs font-bold text-white focus:outline-none focus:border-emerald-500 cursor-pointer"
+            >
+              <option value="ALL">All-Time Career</option>
+              {historical_seasons.map((yr) => (
+                <option key={yr} value={yr}>
+                  {yr} Season
+                </option>
+              ))}
+            </select>
+            <span className="text-xs text-slate-500 hidden sm:inline">
+              {selectedSeason === "ALL" ? "Sorted by Reg Win %" : "Sorted by Reg Finish"}
+            </span>
+          </div>
         </div>
 
         <div className="bg-slate-900/60 border border-slate-800 rounded-xl overflow-hidden shadow-xl">
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
-              <thead className="bg-slate-950/70 text-slate-400 uppercase text-xs border-b border-slate-800">
+              <thead className="bg-slate-950/70 text-slate-400 uppercase text-xs border-b border-slate-800 select-none">
                 <tr>
-                  <th className="py-3 px-4">Manager</th>
-                  <th className="py-3 px-4 text-center">Titles</th>
-                  <th className="py-3 px-4 text-center">Reg Season W-L-T</th>
-                  <th className="py-3 px-4 text-center">Reg Win %</th>
-                  <th className="py-3 px-4 text-right">Points For</th>
-                  <th className="py-3 px-4 text-right">Avg PF/G</th>
-                  <th className="py-3 px-4 text-center">Moves</th>
-                  <th className="py-3 px-4 text-center">Roster Retention</th>
+                  {selectedSeason !== "ALL" && (
+                    <th
+                      onClick={() => handleSort("reg_finish")}
+                      className="py-3 px-4 text-center cursor-pointer hover:text-white transition-colors"
+                    >
+                      <div className="flex items-center justify-center gap-1">
+                        Finish
+                        <ArrowUpDown className="w-3 h-3 text-slate-500" />
+                      </div>
+                    </th>
+                  )}
+                  <th
+                    onClick={() => handleSort("name")}
+                    className="py-3 px-4 cursor-pointer hover:text-white transition-colors"
+                  >
+                    <div className="flex items-center gap-1">
+                      Manager {selectedSeason !== "ALL" && "& Team"}
+                      <ArrowUpDown className="w-3 h-3 text-slate-500" />
+                    </div>
+                  </th>
+                  {selectedSeason === "ALL" ? (
+                    <th
+                      onClick={() => handleSort("titles")}
+                      className="py-3 px-4 text-center cursor-pointer hover:text-white transition-colors"
+                    >
+                      <div className="flex items-center justify-center gap-1">
+                        Titles
+                        <ArrowUpDown className="w-3 h-3 text-slate-500" />
+                      </div>
+                    </th>
+                  ) : (
+                    <th
+                      onClick={() => handleSort("playoffRank")}
+                      className="py-3 px-4 text-center cursor-pointer hover:text-white transition-colors"
+                    >
+                      <div className="flex items-center justify-center gap-1">
+                        Playoffs
+                        <ArrowUpDown className="w-3 h-3 text-slate-500" />
+                      </div>
+                    </th>
+                  )}
+                  <th
+                    onClick={() => handleSort("wins")}
+                    className="py-3 px-4 text-center cursor-pointer hover:text-white transition-colors"
+                  >
+                    <div className="flex items-center justify-center gap-1">
+                      Reg Record
+                      <ArrowUpDown className="w-3 h-3 text-slate-500" />
+                    </div>
+                  </th>
+                  <th
+                    onClick={() => handleSort("win_pct")}
+                    className="py-3 px-4 text-center cursor-pointer hover:text-white transition-colors"
+                  >
+                    <div className="flex items-center justify-center gap-1">
+                      Reg Win %
+                      <ArrowUpDown className="w-3 h-3 text-slate-500" />
+                    </div>
+                  </th>
+                  <th
+                    onClick={() => handleSort("points_for")}
+                    className="py-3 px-4 text-right cursor-pointer hover:text-white transition-colors"
+                  >
+                    <div className="flex items-center justify-end gap-1">
+                      Points For
+                      <ArrowUpDown className="w-3 h-3 text-slate-500" />
+                    </div>
+                  </th>
+                  <th
+                    onClick={() => handleSort("avg_pf")}
+                    className="py-3 px-4 text-right cursor-pointer hover:text-white transition-colors"
+                  >
+                    <div className="flex items-center justify-end gap-1">
+                      Avg PF/G
+                      <ArrowUpDown className="w-3 h-3 text-slate-500" />
+                    </div>
+                  </th>
+                  <th
+                    onClick={() => handleSort("moves")}
+                    className="py-3 px-4 text-center cursor-pointer hover:text-white transition-colors"
+                  >
+                    <div className="flex items-center justify-center gap-1">
+                      Moves
+                      <ArrowUpDown className="w-3 h-3 text-slate-500" />
+                    </div>
+                  </th>
+                  {selectedSeason === "ALL" && (
+                    <th
+                      onClick={() => handleSort("retention")}
+                      className="py-3 px-4 text-center cursor-pointer hover:text-white transition-colors"
+                    >
+                      <div className="flex items-center justify-center gap-1">
+                        Roster Retention
+                        <ArrowUpDown className="w-3 h-3 text-slate-500" />
+                      </div>
+                    </th>
+                  )}
                   <th className="py-3 px-4">Persona Archetype</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800/60 text-slate-300">
-                {managers.map((rawM) => {
-                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                  const m = rawM as any;
+                {tableRows.map((r: any) => {
+                  let rowHighlight = "hover:bg-slate-800/40";
+                  if (selectedSeason !== "ALL") {
+                    if (r.isChamp) {
+                      rowHighlight = "bg-amber-500/10 hover:bg-amber-500/20 border-l-4 border-l-amber-400";
+                    } else if (r.isRunnerUp) {
+                      rowHighlight = "bg-slate-400/10 hover:bg-slate-400/20 border-l-4 border-l-slate-300";
+                    }
+                  }
+
                   return (
-                  <tr key={m.manager_id} className="hover:bg-slate-800/40 transition-colors">
-                    <td className="py-3 px-4">
-                      <Link href={`/managers/${m.manager_id}`} className="font-bold text-white hover:text-emerald-400 flex items-center gap-2">
-                        {m.name}
-                        <ArrowUpRight className="w-3.5 h-3.5 text-slate-500" />
-                      </Link>
-                    </td>
-                    <td className="py-3 px-4 text-center font-extrabold text-amber-400">
-                      {m.career.championships > 0 ? "🏆 " + m.career.championships : "—"}
-                    </td>
-                    <td className="py-3 px-4 text-center font-semibold text-slate-200">
-                      {m.career.wins}-{m.career.losses}{m.career.ties > 0 ? "-" + m.career.ties : ""}
-                    </td>
-                    <td className="py-3 px-4 text-center font-bold text-emerald-400">
-                      {m.career.win_pct}%
-                    </td>
-                    <td className="py-3 px-4 text-right text-slate-300">
-                      {m.career.points_for.toLocaleString()}
-                    </td>
-                    <td className="py-3 px-4 text-right font-medium text-cyan-400">
-                      {m.career.avg_pf_per_game}
-                    </td>
-                    <td className="py-3 px-4 text-center text-slate-400">
-                      {m.career.total_moves}
-                    </td>
-                    <td className="py-3 px-4 text-center text-purple-400 font-semibold">
-                      {m.career.roster_retention_rate ? m.career.roster_retention_rate + "%" : "—"}
-                    </td>
-                    <td className="py-3 px-4">
-                      <div className="flex flex-wrap gap-1">
-                        {m.archetypes.slice(0, 2).map((arch: string) => (
-                          <span
-                            key={arch}
-                            title={ARCHETYPE_DESCRIPTIONS[arch] || arch}
-                            className="px-2 py-0.5 rounded-full text-xs font-semibold bg-slate-800 text-slate-300 border border-slate-700 cursor-help"
-                          >
-                            {arch}
+                    <tr key={r.id} className={`transition-colors ${rowHighlight}`}>
+                      {selectedSeason !== "ALL" && (
+                        <td className="py-3 px-4 text-center font-bold text-slate-400">
+                          #{r.reg_finish}
+                        </td>
+                      )}
+                      <td className="py-3 px-4">
+                        <Link href={`/managers/${r.id}`} className="font-bold text-white hover:text-emerald-400 inline-flex items-center gap-2">
+                          {r.name}
+                          <ArrowUpRight className="w-3.5 h-3.5 text-slate-500" />
+                        </Link>
+                        {selectedSeason !== "ALL" && r.teamName && (
+                          <span className="block text-xs text-slate-400 italic truncate max-w-[200px]">
+                            {r.teamName}
                           </span>
-                        ))}
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
+                        )}
+                      </td>
+                      {selectedSeason === "ALL" ? (
+                        <td className="py-3 px-4 text-center font-extrabold text-amber-400">
+                          {r.titles > 0 ? `🏆 ${r.titles}` : "—"}
+                        </td>
+                      ) : (
+                        <td className="py-3 px-4 text-center font-bold">
+                          {r.isChamp ? (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-400/20 border border-amber-400/40 text-amber-300 text-xs font-black">
+                              <Trophy className="w-3 h-3 text-amber-400" /> 1st (Gold)
+                            </span>
+                          ) : r.isRunnerUp ? (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-slate-300/20 border border-slate-300/40 text-slate-200 text-xs font-bold">
+                              <Medal className="w-3 h-3 text-slate-300" /> 2nd (Silver)
+                            </span>
+                          ) : r.playoffRank ? (
+                            <span className="text-xs text-slate-400">{r.playoffRank}th</span>
+                          ) : (
+                            <span className="text-xs text-slate-500">—</span>
+                          )}
+                        </td>
+                      )}
+                      <td className="py-3 px-4 text-center font-semibold text-slate-200">
+                        {r.wins}-{r.losses}{r.ties > 0 ? `-${r.ties}` : ""}
+                      </td>
+                      <td className="py-3 px-4 text-center font-bold text-emerald-400">
+                        {r.win_pct}%
+                      </td>
+                      <td className="py-3 px-4 text-right text-slate-300">
+                        {r.points_for.toLocaleString()}
+                      </td>
+                      <td className="py-3 px-4 text-right font-medium text-cyan-400">
+                        {r.avg_pf}
+                      </td>
+                      <td className="py-3 px-4 text-center text-slate-400">
+                        {r.moves}
+                      </td>
+                      {selectedSeason === "ALL" && (
+                        <td className="py-3 px-4 text-center text-purple-400 font-semibold">
+                          {r.retention ? `${r.retention}%` : "—"}
+                        </td>
+                      )}
+                      <td className="py-3 px-4">
+                        <div className="flex flex-wrap gap-1">
+                          {r.archetypes.slice(0, 2).map((arch: string) => (
+                            <span
+                              key={arch}
+                              title={ARCHETYPE_DESCRIPTIONS[arch] || arch}
+                              className="px-2 py-0.5 rounded-full text-xs font-semibold bg-slate-800 text-slate-300 border border-slate-700 cursor-help"
+                            >
+                              {arch}
+                            </span>
+                          ))}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
