@@ -96,10 +96,10 @@ export default function RulesPage() {
       {/* Last Place Punishment */}
       <div className="rounded-2xl bg-gradient-to-r from-rose-950/30 to-slate-900/60 border border-rose-900/30 p-6 shadow-xl space-y-3">
         <h2 className="text-lg font-bold text-rose-400 border-b border-rose-900/40 pb-3">
-          Last Place Punishment (The Sacko)
+          Last Place Punishment
         </h2>
         <p className="text-sm text-slate-300">
-          The manager finishing in last place (12th) earns the <strong className="text-rose-300">Sacko</strong> — 
+          The manager finishing in last place (12th) earns the last place punishment — 
           a rotating punishment determined by a vote of all league members before the following season.
           Past punishments have included eating disgusting food combinations on video, 
           posting embarrassing photos, and public pledges.

@@ -5,14 +5,16 @@ import leagueData from "@/data/league_analytics.json";
 import { Calendar, Search, TrendingDown, TrendingUp } from "lucide-react";
 
 export default function DraftsPage() {
-  const { draft_archive, historical_seasons } = leagueData;
+  const { draft_archive, historical_seasons, managers } = leagueData;
   const [selectedYear, setSelectedYear] = useState<number>(historical_seasons[historical_seasons.length - 1] || 2024);
   const [posFilter, setPosFilter] = useState<string>("ALL");
+  const [managerFilter, setManagerFilter] = useState<string>("ALL");
   const [searchQuery, setSearchQuery] = useState<string>("");
 
   const filteredPicks = draft_archive.filter((p) => {
     if (p.year !== selectedYear) return false;
     if (posFilter !== "ALL" && p.position !== posFilter) return false;
+    if (managerFilter !== "ALL" && p.manager_name !== managerFilter) return false;
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
       return p.player_name.toLowerCase().includes(q) || p.manager_name.toLowerCase().includes(q);
@@ -76,15 +78,30 @@ export default function DraftsPage() {
             ))}
           </div>
 
-          <div className="relative w-full sm:w-64">
-            <Search className="w-4 h-4 text-slate-500 absolute left-3 top-2.5 pointer-events-none" />
-            <input
-              type="text"
-              placeholder="Search player or manager..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-slate-950 border border-slate-700 rounded-lg pl-9 pr-3 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500"
-            />
+          <div className="flex flex-col sm:flex-row items-center gap-2 w-full sm:w-auto">
+            <select
+              value={managerFilter}
+              onChange={(e) => setManagerFilter(e.target.value)}
+              className="bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-emerald-500 w-full sm:w-auto"
+            >
+              <option value="ALL">All Managers</option>
+              {managers.map((m) => (
+                <option key={m.manager_id} value={m.name}>
+                  {m.name}
+                </option>
+              ))}
+            </select>
+
+            <div className="relative w-full sm:w-56">
+              <Search className="w-4 h-4 text-slate-500 absolute left-3 top-2 pointer-events-none" />
+              <input
+                type="text"
+                placeholder="Search player..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full bg-slate-950 border border-slate-700 rounded-lg pl-9 pr-3 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500"
+              />
+            </div>
           </div>
         </div>
       </div>

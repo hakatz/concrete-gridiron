@@ -367,8 +367,6 @@ def generate_analytics():
         archetypes = []
         if c_stat["championships"] >= 3:
             archetypes.append("Dynasty Architect")
-        elif c_stat["championships"] >= 1:
-            archetypes.append("League Champion")
 
         if avg_moves_per_season >= 25:
             archetypes.append("Waiver Wire Hawk")

@@ -9,6 +9,8 @@ export default function H2HPage() {
   const { h2h_matrix, managers } = leagueData;
   const [selectedM1, setSelectedM1] = useState(managers[0]?.manager_id || "");
   const [selectedM2, setSelectedM2] = useState(managers[1]?.manager_id || "");
+  const [hoveredRow, setHoveredRow] = useState<string | null>(null);
+  const [hoveredCol, setHoveredCol] = useState<string | null>(null);
 
   const m1Data = managers.find((m) => m.manager_id === selectedM1);
   const m2Data = managers.find((m) => m.manager_id === selectedM2);
@@ -141,72 +143,113 @@ export default function H2HPage() {
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full text-center text-xs border-collapse">
+          <table
+            className="w-full text-center text-xs border-collapse"
+            onMouseLeave={() => {
+              setHoveredRow(null);
+              setHoveredCol(null);
+            }}
+          >
             <thead>
               <tr className="bg-slate-950/80 text-slate-400">
                 <th className="p-2.5 text-left border border-slate-800 font-bold sticky left-0 bg-slate-950">
                   Manager
                 </th>
-                {managers.map((opp) => (
-                  <th
-                    key={opp.manager_id}
-                    className="p-2.5 border border-slate-800 font-bold truncate max-w-[100px]"
-                    title={opp.name}
-                  >
-                    {opp.name.split(" ")[0]}
-                  </th>
-                ))}
+                {managers.map((opp) => {
+                  const isColHighlighted = hoveredCol === opp.manager_id;
+                  return (
+                    <th
+                      key={opp.manager_id}
+                      className={`p-2.5 border border-slate-800 font-bold truncate max-w-[100px] transition-colors ${
+                        isColHighlighted ? "bg-slate-800 text-white border-b-cyan-500 font-black" : ""
+                      }`}
+                      title={opp.name}
+                    >
+                      {opp.name.split(" ")[0]}
+                    </th>
+                  );
+                })}
               </tr>
             </thead>
             <tbody>
-              {h2h_matrix.map((row) => (
-                <tr key={row.manager_id} className="hover:bg-slate-800/20">
-                  <td className="p-2.5 text-left font-bold text-white border border-slate-800 sticky left-0 bg-slate-900 truncate max-w-[140px]">
-                    <Link href={`/managers/${row.manager_id}`} className="hover:text-emerald-400">
-                      {row.manager_name}
-                    </Link>
-                  </td>
-                  {managers.map((opp) => {
-                    if (row.manager_id === opp.manager_id) {
+              {h2h_matrix.map((row) => {
+                const isRowHighlighted = hoveredRow === row.manager_id;
+                return (
+                  <tr
+                    key={row.manager_id}
+                    className={`transition-colors ${isRowHighlighted ? "bg-slate-800/40" : ""}`}
+                  >
+                    <td
+                      className={`p-2.5 text-left font-bold border border-slate-800 sticky left-0 truncate max-w-[140px] transition-colors ${
+                        isRowHighlighted ? "bg-slate-800 text-cyan-300 font-black" : "bg-slate-900 text-white"
+                      }`}
+                    >
+                      <Link href={`/managers/${row.manager_id}`} className="hover:text-emerald-400">
+                        {row.manager_name}
+                      </Link>
+                    </td>
+                    {managers.map((opp) => {
+                      const isColHighlighted = hoveredCol === opp.manager_id;
+                      const isIntersected = isRowHighlighted && isColHighlighted;
+
+                      if (row.manager_id === opp.manager_id) {
+                        return (
+                          <td
+                            key={opp.manager_id}
+                            onMouseEnter={() => {
+                              setHoveredRow(row.manager_id);
+                              setHoveredCol(opp.manager_id);
+                            }}
+                            className={`p-2.5 border border-slate-800/80 text-slate-700 font-black transition-colors ${
+                              isIntersected ? "bg-slate-800 text-slate-500" : isRowHighlighted || isColHighlighted ? "bg-slate-900/90 text-slate-600" : "bg-slate-950/80"
+                            }`}
+                          >
+                            —
+                          </td>
+                        );
+                      }
+                      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                      const stats = (row.opponents as any)?.[opp.manager_id] || {
+                        wins: 0,
+                        losses: 0,
+                        ties: 0,
+                      };
+                      const isWinning = stats.wins > stats.losses;
+                      const isLosing = stats.losses > stats.wins;
+
+                      let cellBg = isWinning
+                        ? "bg-emerald-500/10 text-emerald-300"
+                        : isLosing
+                        ? "bg-rose-500/10 text-rose-300"
+                        : "text-slate-400";
+
+                      if (isIntersected) {
+                        cellBg += " ring-2 ring-cyan-400 bg-cyan-950/70 font-black z-10 scale-105 shadow-md";
+                      } else if (isRowHighlighted || isColHighlighted) {
+                        cellBg += " brightness-125 bg-slate-800/60";
+                      }
+
                       return (
                         <td
                           key={opp.manager_id}
-                          className="p-2.5 border border-slate-800/80 bg-slate-950/80 text-slate-700 font-black"
+                          onMouseEnter={() => {
+                            setHoveredRow(row.manager_id);
+                            setHoveredCol(opp.manager_id);
+                          }}
+                          onClick={() => {
+                            setSelectedM1(row.manager_id);
+                            setSelectedM2(opp.manager_id);
+                          }}
+                          className={`p-2.5 border border-slate-800/80 cursor-pointer font-bold transition-all relative ${cellBg}`}
+                          title={`${row.manager_name} vs ${opp.name}: ${stats.wins}-${stats.losses}`}
                         >
-                          —
+                          {stats.wins}-{stats.losses}
                         </td>
                       );
-                    }
-                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                    const stats = (row.opponents as any)?.[opp.manager_id] || {
-                      wins: 0,
-                      losses: 0,
-                      ties: 0,
-                    };
-                    const isWinning = stats.wins > stats.losses;
-                    const isLosing = stats.losses > stats.wins;
-                    const cellClass = isWinning
-                      ? "bg-emerald-500/10 text-emerald-300"
-                      : isLosing
-                      ? "bg-rose-500/10 text-rose-300"
-                      : "text-slate-400";
-
-                    return (
-                      <td
-                        key={opp.manager_id}
-                        onClick={() => {
-                          setSelectedM1(row.manager_id);
-                          setSelectedM2(opp.manager_id);
-                        }}
-                        className={`p-2.5 border border-slate-800/80 cursor-pointer font-bold transition-colors ${cellClass}`}
-                        title={`${row.manager_name} vs ${opp.name}: ${stats.wins}-${stats.losses}`}
-                      >
-                        {stats.wins}-{stats.losses}
-                      </td>
-                    );
-                  })}
-                </tr>
-              ))}
+                    })}
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>

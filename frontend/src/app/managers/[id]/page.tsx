@@ -14,7 +14,6 @@ import ManagerCharts from "./ManagerCharts";
 
 const ARCHETYPE_DESCRIPTIONS: Record<string, string> = {
   "Dynasty Architect": "Won 3+ championships across their career",
-  "League Champion": "Won 1 championship",
   "Waiver Wire Hawk": "Averages 25+ waiver moves per season",
   "Draft-and-Hold Purist": "Rarely makes waiver moves; trusts their draft",
   "Blockbuster Trader": "Averages 1.5+ trades per season",
